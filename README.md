@@ -26,7 +26,7 @@ import (
 
 func main() {
 	m := manager.NewHSKeyManager()
-	m.AddKey("key1", "sdfsdfsdfsdfasdfdsfasdfsdfasdf")
+	m.AddKey("key1", "sdfsdfsdfsdfasdfdsfasdfsdfasdf") // secrets should be stored in env variables
 	// For RSA keys add the path to the key
 	// Eg:
 	//     m := manager.NewRSKeyManager()
@@ -37,7 +37,8 @@ func main() {
 		ExpiresIn: 15 * 60, // 15 minutes
 	}
 
-	oauthServer := server.NewOAuthServer(m, v)
+	// Specify here which key to use. For example, we are using key1 here
+	oauthServer := server.NewOAuthServer("key1", m, v)
 
 	// Password grant flow endpoint example
 	http.HandleFunc("POST /oauth2/token", oauthServer.ResourceOwnerPasswordCredential(func(username string, password string) {

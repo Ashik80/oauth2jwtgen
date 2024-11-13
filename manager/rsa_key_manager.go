@@ -17,10 +17,10 @@ func NewRSKeyManager() *RSKeyManager {
 	}
 }
 
-func (m *RSKeyManager) AddKey(kid, path string) {
+func (m *RSKeyManager) AddKey(kid, secret string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.Keys[kid] = path
+	m.Keys[kid] = secret
 }
 
 func (m *RSKeyManager) GetKey(kid string) ([]byte, error) {

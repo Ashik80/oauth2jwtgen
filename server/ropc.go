@@ -9,13 +9,14 @@ import (
 )
 
 type OAuthServer struct {
+	kid      string
 	kmanager manager.Manager
 	validity *accessor.Validity
 }
 
-func NewOAuthServer(kmanager manager.Manager, validity *accessor.Validity) *OAuthServer {
+func NewOAuthServer(kid string, kmanager manager.Manager, validity *accessor.Validity) *OAuthServer {
 	return &OAuthServer{
-		kmanager, validity,
+		kid, kmanager, validity,
 	}
 }
 
@@ -46,14 +47,14 @@ func (o *OAuthServer) ResourceOwnerPasswordCredential(f func(username string, pa
 		var err error
 
 		if man, ok := o.kmanager.(*manager.HSKeyManager); ok {
-			access, err = accessor.NewHS256Access("key1", man, o.validity)
+			access, err = accessor.NewHS256Access(o.kid, man, o.validity)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 				return
 			}
 		} else if man, ok := o.kmanager.(*manager.RSKeyManager); ok {
-			access, err = accessor.NewRS256Access("key1", man, o.validity)
+			access, err = accessor.NewRS256Access(o.kid, man, o.validity)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})

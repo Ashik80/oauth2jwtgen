@@ -1,11 +1,15 @@
 package accessor
 
 import (
+	"context"
+	"encoding/base64"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/Ashik80/oauth2jwtgen/store"
 	"github.com/golang-jwt/jwt"
+	"github.com/google/uuid"
 )
 
 type Validity struct {
@@ -13,28 +17,10 @@ type Validity struct {
 }
 
 type Token struct {
-	AccessToken string `json:"access_token"`
-
-	// TokenType is the type of token.
-	// The Type method returns either this or "Bearer", the default.
-	TokenType string `json:"token_type,omitempty"`
-
+	AccessToken  string `json:"access_token"`
+	TokenType    string `json:"token_type,omitempty"`
 	RefreshToken string `json:"refresh_token,omitempty"`
-
-	// Expiry is the optional expiration time of the access token.
-	//
-	// If zero, TokenSource implementations will reuse the same
-	// token forever and RefreshToken or equivalent
-	// mechanisms for that TokenSource will not be used.
-	Expiry time.Time `json:"expiry,omitempty"`
-
-	// ExpiresIn is the OAuth2 wire format "expires_in" field,
-	// which specifies how many seconds later the token expires,
-	// relative to an unknown time base approximately around "now".
-	// It is the application's responsibility to populate
-	// `Expiry` from `ExpiresIn` when required.
-	ExpiresIn int64 `json:"expires_in,omitempty"`
-	// contains filtered or unexported fields
+	ExpiresIn    int64  `json:"expires_in,omitempty"`
 }
 
 type JWTAccess interface {
@@ -44,7 +30,7 @@ type JWTAccess interface {
 	GetExpiresIn() int64
 }
 
-func NewToken(a JWTAccess, claims *JWTAccessClaims) (*Token, error) {
+func NewToken(ctx context.Context, a JWTAccess, claims *JWTAccessClaims, s store.TokenStore) (*Token, error) {
 	signingMethod := a.GetSigningMethod()
 
 	token := jwt.NewWithClaims(signingMethod, claims)
@@ -69,10 +55,22 @@ func NewToken(a JWTAccess, claims *JWTAccessClaims) (*Token, error) {
 		return nil, fmt.Errorf("failed to sign token: %w", err)
 	}
 
+	id := uuid.NewSHA1(uuid.New(), []byte(access)).String()
+	refresh := base64.URLEncoding.EncodeToString([]byte(id))
+
+	ti := &store.TokenInfo{
+		ResourceOwnerId: id,
+		AccessToken:     access,
+		Expiry:          time.Now().Add(time.Duration(15 * 60)),
+	}
+	if err = s.StoreToken(ctx, ti); err != nil {
+		return nil, err
+	}
+
 	return &Token{
 		AccessToken:  access,
 		TokenType:    "Bearer",
-		RefreshToken: "sdfsdfsdf",
+		RefreshToken: refresh,
 		ExpiresIn:    a.GetExpiresIn(),
 	}, nil
 }

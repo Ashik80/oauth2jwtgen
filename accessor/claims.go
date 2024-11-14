@@ -8,9 +8,10 @@ import (
 
 type JWTAccessClaims struct {
 	jwt.StandardClaims
+	Scope string `json:"scope,omitempty"`
 }
 
-func GenerateClaims(a JWTAccess, sub string, issuer string, aud string) *JWTAccessClaims {
+func GenerateClaims(a JWTAccess, sub string, issuer string, aud string, scope string) *JWTAccessClaims {
 	iat := time.Now().UTC().Unix()
 
 	claims := &JWTAccessClaims{
@@ -21,6 +22,7 @@ func GenerateClaims(a JWTAccess, sub string, issuer string, aud string) *JWTAcce
 			IssuedAt:  iat,
 			ExpiresAt: iat + a.GetExpiresIn(),
 		},
+		Scope: scope,
 	}
 	return claims
 }

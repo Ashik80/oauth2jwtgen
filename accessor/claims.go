@@ -20,7 +20,7 @@ func GenerateClaims(a JWTAccess, sub string, issuer string, aud string, scope st
 			Audience:  aud,
 			Subject:   sub,
 			IssuedAt:  iat,
-			ExpiresAt: iat + a.GetExpiresIn(),
+			ExpiresAt: iat + a.GetAccessExpiresIn(),
 		},
 		Scope: scope,
 	}

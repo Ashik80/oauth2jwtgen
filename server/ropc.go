@@ -18,8 +18,23 @@ type OAuthServer struct {
 }
 
 func NewOAuthServer(kid string, kmanager manager.Manager, validity *accessor.Validity, store store.TokenStore) *OAuthServer {
+	var v accessor.Validity
+	if validity == nil {
+		v.SetDefaultAccessExpiresIn()
+		v.SetDefaultRefreshExpiresIn()
+	} else {
+		v.AccessExpiresIn = validity.AccessExpiresIn
+		v.RefreshExpiresIn = validity.RefreshExpiresIn
+		if v.AccessExpiresIn == 0 {
+			v.SetDefaultAccessExpiresIn()
+		}
+	}
+
 	return &OAuthServer{
-		kid, kmanager, validity, store,
+		kid:      kid,
+		kmanager: kmanager,
+		validity: &v,
+		store:    store,
 	}
 }
 

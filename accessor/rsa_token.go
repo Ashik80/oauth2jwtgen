@@ -7,10 +7,11 @@ import (
 )
 
 type RS256Access struct {
-	SignedKeyID   string
-	SignedKey     []byte
-	SigningMethod jwt.SigningMethod
-	ExpiresIn     int64
+	SignedKeyID      string
+	SignedKey        []byte
+	SigningMethod    jwt.SigningMethod
+	AccessExpiresIn  int64
+	RefreshExpiresIn int64
 }
 
 func NewRS256Access(kid string, manager *manager.RSKeyManager, validity *Validity) (*RS256Access, error) {
@@ -19,15 +20,11 @@ func NewRS256Access(kid string, manager *manager.RSKeyManager, validity *Validit
 		return nil, err
 	}
 	r := &RS256Access{
-		SignedKeyID:   kid,
-		SignedKey:     key,
-		SigningMethod: jwt.SigningMethodRS256,
-	}
-
-	if validity != nil {
-		r.ExpiresIn = validity.ExpiresIn
-	} else {
-		r.ExpiresIn = int64(10 * 60)
+		SignedKeyID:      kid,
+		SignedKey:        key,
+		SigningMethod:    jwt.SigningMethodRS256,
+		AccessExpiresIn:  validity.AccessExpiresIn,
+		RefreshExpiresIn: validity.RefreshExpiresIn,
 	}
 
 	return r, nil
@@ -41,8 +38,12 @@ func (r *RS256Access) GetSignedKey() []byte {
 	return r.SignedKey
 }
 
-func (r *RS256Access) GetExpiresIn() int64 {
-	return r.ExpiresIn
+func (r *RS256Access) GetAccessExpiresIn() int64 {
+	return r.AccessExpiresIn
+}
+
+func (r *RS256Access) GetRefreshExpiresIn() int64 {
+	return r.RefreshExpiresIn
 }
 
 func (r *RS256Access) GetSigningMethod() jwt.SigningMethod {

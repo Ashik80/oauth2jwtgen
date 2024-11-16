@@ -22,7 +22,8 @@ func main() {
 
 	// By default validity of token is 10 minutes
 	v := &accessor.Validity{
-		ExpiresIn: 15 * 60, // 15 minutes
+		AccessExpiresIn:  15 * 60, // 15 minutes
+		RefreshExpiresIn: 30 * 60, // 30 minutes
 	}
 
 	ctx := context.Background()

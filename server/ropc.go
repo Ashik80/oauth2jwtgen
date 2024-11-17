@@ -19,8 +19,13 @@ type OAuthServer struct {
 }
 
 func NewOAuthServer(kid string, kmanager manager.Manager, opt *options.AuthOptions) (*OAuthServer, error) {
-	if opt == nil || opt.Validity == nil {
-		opt = options.DefaultAuthOptions()
+	if opt.Store == nil {
+		return nil, fmt.Errorf("token store not specified")
+	}
+	if opt.Validity == nil {
+		opt.Validity = new(options.Validity)
+		opt.Validity.SetDefaultAccessExpiresIn()
+		opt.Validity.SetDefaultRefreshExpiresIn()
 	}
 	if opt.Validity.AccessExpiresIn == 0 {
 		opt.Validity.SetDefaultAccessExpiresIn()

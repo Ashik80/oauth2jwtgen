@@ -6,9 +6,9 @@ import (
 )
 
 type TokenStore interface {
-	CloseConnection()
 	CreateStore(ctx context.Context) error
 	StoreToken(ctx context.Context, tokenInfo *TokenInfo) error
+	CloseConnection() error
 }
 
 type TokenInfo struct {

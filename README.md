@@ -17,19 +17,21 @@ keyManager.AddKey("key1", "thesecret")
 
 2. Set up token storage
 
-Then define and create a token storage. For now, the package implements postgres storage. You can implement your own token storage but it must implement the TokenStorage interface.
+Then define and create a token storage. The package implements memory storage as an example (refer to the example.go file). Here is how you can do it with postgres. *YOU MUST IMPLEMENT IT FIRST.*
 
 ```go
 s, _ = store.NewPgTokenStore(ctx, "postgresql://postgres:postgres@localhost:5432/go_db")
 s.CreateStore(ctx)
 ```
 
+You can implement your own token storage but it must implement the TokenStorage interface.
 The TokenStore interface
+
 ```go
 type TokenStore interface {
 	CreateStore(ctx context.Context) error
 	StoreToken(ctx context.Context, tokenInfo *TokenInfo) error
-	CloseConnection()
+	CloseConnection() error
 }
 ```
 
@@ -140,16 +142,10 @@ func main() {
 	ctx := context.Background()
 
 	// Create storage to save tokens
-	var s store.TokenStore
-	var err error
-	if s, err = store.NewPgTokenStore(ctx, "postgresql://postgres:postgres@localhost:5432/go_db"); err != nil {
+	s := new(store.MemoryTokenStore)
+	if err := s.CreateStore(ctx); err != nil {
 		log.Fatalf("%v", err)
 	}
-	if err = s.CreateStore(ctx); err != nil {
-		log.Fatalf("%v", err)
-	}
-
-	defer s.CloseConnection()
 
 	// Set the options for the Auth server
 	o := &options.AuthOptions{
@@ -168,7 +164,7 @@ func main() {
 		"POST /oauth2/token",
 		oauthServer.ResourceOwnerPasswordCredential(
 			ctx,
-			func(username string, password string, options *options.AuthOptions) {
+			func(username string, password string, opt *options.AuthOptions) {
 				fmt.Printf("do something with %s and %s\n", username, password)
 			}))
 

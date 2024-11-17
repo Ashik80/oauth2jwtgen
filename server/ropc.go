@@ -86,14 +86,19 @@ func (o *OAuthServer) ResourceOwnerPasswordCredential(
 		issuer := r.Host
 
 		accessClaims := claims.GenerateClaims(username, issuer, aud, scope, o.options.Validity.AccessExpiresIn)
-		claims := &claims.JWTClaims{
+		c := &claims.JWTClaims{
 			AccessClaims: accessClaims,
 		}
 
 		// Function passed by user where they save the hashed password to db
 		f(username, password, o.options)
 
-		token, err := accessor.NewToken(ctx, access, claims, o.options)
+		if o.options.IsIdTokenClaimsSet() {
+			c.IdClaims = o.options.GetIdToken()
+			claims.CopyStandardClaims(&c.IdClaims.StandardClaims, &accessClaims.StandardClaims)
+		}
+
+		token, err := accessor.NewToken(ctx, access, c, o.options)
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)

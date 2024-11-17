@@ -42,3 +42,11 @@ func GenerateClaims(sub string, issuer string, aud string, scope string, expires
 	}
 	return claims
 }
+
+func CopyStandardClaims(dest *jwt.StandardClaims, src *jwt.StandardClaims) {
+	dest.Issuer = src.Issuer
+	dest.Audience = src.Audience
+	dest.Subject = src.Subject
+	dest.IssuedAt = src.IssuedAt
+	dest.ExpiresAt = src.ExpiresAt
+}

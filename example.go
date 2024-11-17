@@ -57,7 +57,7 @@ func main() {
 		"POST /oauth2/token",
 		oauthServer.ResourceOwnerPasswordCredential(
 			ctx,
-			func(username string, password string, options *options.AuthOptions) {
+			func(username string, password string, opt *options.AuthOptions) {
 				fmt.Printf("do something with %s and %s\n", username, password)
 			}))
 

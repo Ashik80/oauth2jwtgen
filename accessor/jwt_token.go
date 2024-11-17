@@ -62,7 +62,7 @@ func NewToken(ctx context.Context, a JWTAccess, claims *claims.JWTClaims, opt *o
 	if claims.IdClaims != nil {
 		idToken := jwt.NewWithClaims(signingMethod, claims.IdClaims)
 		idToken.Header["kid"] = a.GetSignedKeyID()
-		idstring, err := token.SignedString(key)
+		idstring, err := idToken.SignedString(key)
 		if err != nil {
 			return nil, fmt.Errorf("failed to sign token: %w", err)
 		}

@@ -29,16 +29,10 @@ func main() {
 	ctx := context.Background()
 
 	// Create storage to save tokens
-	var s store.TokenStore
-	var err error
-	if s, err = store.NewPgTokenStore(ctx, "postgresql://postgres:postgres@localhost:5432/go_db"); err != nil {
+	s := new(store.MemoryTokenStore)
+	if err := s.CreateStore(ctx); err != nil {
 		log.Fatalf("%v", err)
 	}
-	if err = s.CreateStore(ctx); err != nil {
-		log.Fatalf("%v", err)
-	}
-
-	defer s.CloseConnection()
 
 	// Set the options for the Auth server
 	o := &options.AuthOptions{

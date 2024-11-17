@@ -7,27 +7,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Ashik80/oauth2jwtgen/claims"
+	"github.com/Ashik80/oauth2jwtgen/options"
 	"github.com/Ashik80/oauth2jwtgen/store"
 	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 )
 
-type Validity struct {
-	AccessExpiresIn  int64
-	RefreshExpiresIn int64
-}
-
-func (v *Validity) SetDefaultAccessExpiresIn() {
-	v.AccessExpiresIn = 10 * 60
-}
-
-func (v *Validity) SetDefaultRefreshExpiresIn() {
-	v.RefreshExpiresIn = 60 * 60
-}
-
 type Token struct {
 	AccessToken  string `json:"access_token"`
 	TokenType    string `json:"token_type,omitempty"`
+	IdToken      string `json:"id_token,omitempty"`
 	RefreshToken string `json:"refresh_token,omitempty"`
 	ExpiresIn    int64  `json:"expires_in,omitempty"`
 }
@@ -36,17 +26,13 @@ type JWTAccess interface {
 	GetSignedKeyID() string
 	GetSignedKey() []byte
 	GetSigningMethod() jwt.SigningMethod
-	GetAccessExpiresIn() int64
-	GetRefreshExpiresIn() int64
 }
 
-func NewToken(ctx context.Context, a JWTAccess, claims *JWTAccessClaims, s store.TokenStore) (*Token, error) {
+func NewToken(ctx context.Context, a JWTAccess, claims *claims.JWTClaims, opt *options.AuthOptions) (*Token, error) {
 	signingMethod := a.GetSigningMethod()
-
-	token := jwt.NewWithClaims(signingMethod, claims)
-
 	signedKey := a.GetSignedKey()
 
+	// get appropriate signing key
 	var key interface{}
 	if strings.HasPrefix(signingMethod.Alg(), "RS") {
 		privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(signedKey)
@@ -58,8 +44,9 @@ func NewToken(ctx context.Context, a JWTAccess, claims *JWTAccessClaims, s store
 		key = signedKey
 	}
 
+	// generate access token
+	token := jwt.NewWithClaims(signingMethod, claims.AccessClaims)
 	token.Header["kid"] = a.GetSignedKeyID()
-
 	access, err := token.SignedString(key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign token: %w", err)
@@ -68,19 +55,32 @@ func NewToken(ctx context.Context, a JWTAccess, claims *JWTAccessClaims, s store
 	tok := &Token{
 		AccessToken: access,
 		TokenType:   "Bearer",
-		ExpiresIn:   a.GetAccessExpiresIn(),
+		ExpiresIn:   opt.Validity.AccessExpiresIn,
 	}
 
-	if a.GetRefreshExpiresIn() != 0 {
+	// generate id token
+	if claims.IdClaims != nil {
+		idToken := jwt.NewWithClaims(signingMethod, claims.IdClaims)
+		idToken.Header["kid"] = a.GetSignedKeyID()
+		idstring, err := token.SignedString(key)
+		if err != nil {
+			return nil, fmt.Errorf("failed to sign token: %w", err)
+		}
+		tok.IdToken = idstring
+	}
+
+	// generate refresh token
+	refreshExpiresIn := opt.Validity.RefreshExpiresIn
+	if refreshExpiresIn != 0 {
 		id := uuid.NewSHA1(uuid.New(), []byte(access)).String()
 		refresh := base64.URLEncoding.EncodeToString([]byte(id))
 
 		ti := &store.TokenInfo{
 			ResourceOwnerId: id,
 			AccessToken:     access,
-			Expiry:          time.Now().Add(time.Duration(a.GetRefreshExpiresIn()) * time.Second),
+			Expiry:          time.Now().Add(time.Duration(refreshExpiresIn) * time.Second),
 		}
-		if err = s.StoreToken(ctx, ti); err != nil {
+		if err = opt.Store.StoreToken(ctx, ti); err != nil {
 			return nil, err
 		}
 		tok.RefreshToken = refresh

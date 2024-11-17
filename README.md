@@ -27,9 +27,18 @@ s.CreateStore(ctx)
 The TokenStore interface
 ```go
 type TokenStore interface {
-	CloseConnection()
 	CreateStore(ctx context.Context) error
 	StoreToken(ctx context.Context, tokenInfo *TokenInfo) error
+	CloseConnection()
+}
+```
+
+3. Set the options for the auth server
+
+```go
+serverOptions := &options.AuthOptions{
+    Validity: v,
+    Store:    s,
 }
 ```
 
@@ -38,7 +47,7 @@ type TokenStore interface {
 And then we can initialize oauth server with the key manager
 
 ```go
-oauthServer := server.NewOAuthServer("key1", keyManager, nil, s)
+oauthServer := server.NewOAuthServer("key1", keyManager, serverOptions)
 ```
 
 4. Define the endpoint
@@ -48,9 +57,11 @@ Then we can call the password grant endpoint like this
 ```go
 http.HandleFunc(
     "POST /oauth2/token",
-    oauthServer.ResourceOwnerPasswordCredential(ctx, func(username string, password string) {
-        fmt.Printf("do something with %s and %s\n", username, password)
-    }))
+    oauthServer.ResourceOwnerPasswordCredential(
+        ctx,
+        func(username string, password string, options *options.AuthOptions) {
+            fmt.Printf("do something with %s and %s\n", username, password)
+        }))
 ```
 
 ## Default claims
@@ -78,11 +89,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
-	"os"
 
-	"github.com/Ashik80/oauth2jwtgen/accessor"
 	"github.com/Ashik80/oauth2jwtgen/manager"
+	"github.com/Ashik80/oauth2jwtgen/options"
 	"github.com/Ashik80/oauth2jwtgen/server"
 	"github.com/Ashik80/oauth2jwtgen/store"
 )
@@ -96,35 +107,45 @@ func main() {
 	//     m.AddKey("key1", "keys/private.key")
 
 	// By default validity of token is 10 minutes
-	v := &accessor.Validity{
+	v := &options.Validity{
 		AccessExpiresIn:  15 * 60, // 15 minutes
 		RefreshExpiresIn: 30 * 60, // 30 minutes
 	}
 
 	ctx := context.Background()
 
-	// Create storage to save tokens. You can implement your own token storage.
-	// As long as the store implements the TokenStore interface
+	// Create storage to save tokens
 	var s store.TokenStore
 	var err error
 	if s, err = store.NewPgTokenStore(ctx, "postgresql://postgres:postgres@localhost:5432/go_db"); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatalf("%v", err)
 	}
 	if err = s.CreateStore(ctx); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatalf("%v", err)
+	}
+
+	defer s.CloseConnection()
+
+	// Set the options for the Auth server
+	o := &options.AuthOptions{
+		Validity: v,
+		Store:    s,
 	}
 
 	// Specify here which key to use. For example, we are using key1 here
-	oauthServer := server.NewOAuthServer("key1", m, v, s)
+	oauthServer, err := server.NewOAuthServer("key1", m, o)
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
 
 	// Password grant flow endpoint example
 	http.HandleFunc(
 		"POST /oauth2/token",
-		oauthServer.ResourceOwnerPasswordCredential(ctx, func(username string, password string) {
-			fmt.Printf("do something with %s and %s\n", username, password)
-		}))
+		oauthServer.ResourceOwnerPasswordCredential(
+			ctx,
+			func(username string, password string, options *options.AuthOptions) {
+				fmt.Printf("do something with %s and %s\n", username, password)
+			}))
 
 	http.ListenAndServe(":4040", nil)
 }

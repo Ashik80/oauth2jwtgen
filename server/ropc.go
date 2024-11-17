@@ -3,45 +3,44 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/Ashik80/oauth2jwtgen/accessor"
+	"github.com/Ashik80/oauth2jwtgen/claims"
 	"github.com/Ashik80/oauth2jwtgen/manager"
-	"github.com/Ashik80/oauth2jwtgen/store"
+	"github.com/Ashik80/oauth2jwtgen/options"
 )
 
 type OAuthServer struct {
 	kid      string
 	kmanager manager.Manager
-	validity *accessor.Validity
-	store    store.TokenStore
+	options  *options.AuthOptions
 }
 
-func NewOAuthServer(kid string, kmanager manager.Manager, validity *accessor.Validity, store store.TokenStore) *OAuthServer {
-	var v accessor.Validity
-	if validity == nil {
-		v.SetDefaultAccessExpiresIn()
-		v.SetDefaultRefreshExpiresIn()
-	} else {
-		v.AccessExpiresIn = validity.AccessExpiresIn
-		v.RefreshExpiresIn = validity.RefreshExpiresIn
-		if v.AccessExpiresIn == 0 {
-			v.SetDefaultAccessExpiresIn()
-		}
+func NewOAuthServer(kid string, kmanager manager.Manager, opt *options.AuthOptions) (*OAuthServer, error) {
+	if opt == nil || opt.Validity == nil {
+		opt = options.DefaultAuthOptions()
+	}
+	if opt.Validity.AccessExpiresIn == 0 {
+		opt.Validity.SetDefaultAccessExpiresIn()
+	}
+
+	if opt.Store == nil {
+		return nil, fmt.Errorf("token store not specified")
 	}
 
 	return &OAuthServer{
 		kid:      kid,
 		kmanager: kmanager,
-		validity: &v,
-		store:    store,
-	}
+		options:  opt,
+	}, nil
 }
 
-func (o *OAuthServer) ResourceOwnerPasswordCredential(ctx context.Context, f func(username string, password string)) http.HandlerFunc {
+func (o *OAuthServer) ResourceOwnerPasswordCredential(
+	ctx context.Context,
+	f func(username string, password string, opt *options.AuthOptions)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		defer o.store.CloseConnection()
-
 		if err := r.ParseForm(); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -61,21 +60,18 @@ func (o *OAuthServer) ResourceOwnerPasswordCredential(ctx context.Context, f fun
 		aud := r.FormValue("client_id")
 		scope := r.FormValue("scope")
 
-		// Function passed by user where they save the hashed password to db
-		f(username, password)
-
 		var access accessor.JWTAccess
 		var err error
 
 		if man, ok := o.kmanager.(*manager.HSKeyManager); ok {
-			access, err = accessor.NewHS256Access(o.kid, man, o.validity)
+			access, err = accessor.NewHS256Access(o.kid, man)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 				return
 			}
 		} else if man, ok := o.kmanager.(*manager.RSKeyManager); ok {
-			access, err = accessor.NewRS256Access(o.kid, man, o.validity)
+			access, err = accessor.NewRS256Access(o.kid, man)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -89,8 +85,15 @@ func (o *OAuthServer) ResourceOwnerPasswordCredential(ctx context.Context, f fun
 
 		issuer := r.Host
 
-		claims := accessor.GenerateClaims(access, username, issuer, aud, scope)
-		token, err := accessor.NewToken(ctx, access, claims, o.store)
+		accessClaims := claims.GenerateClaims(username, issuer, aud, scope, o.options.Validity.AccessExpiresIn)
+		claims := &claims.JWTClaims{
+			AccessClaims: accessClaims,
+		}
+
+		// Function passed by user where they save the hashed password to db
+		f(username, password, o.options)
+
+		token, err := accessor.NewToken(ctx, access, claims, o.options)
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)

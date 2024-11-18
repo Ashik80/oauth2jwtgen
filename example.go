@@ -51,8 +51,9 @@ func main() {
 		"POST /oauth2/token",
 		oauthServer.ResourceOwnerPasswordCredential(
 			ctx,
-			func(username string, password string, opt *options.AuthOptions) {
+			func(username string, password string, opt *options.AuthOptions) *server.CallbackError {
 				fmt.Printf("do something with %s and %s\n", username, password)
+				return nil
 			}))
 
 	http.ListenAndServe(":4040", nil)

@@ -18,6 +18,21 @@ type OAuthServer struct {
 	options  *options.AuthOptions
 }
 
+type CallbackError struct {
+	StatusCode int
+	Message    string
+}
+
+func (c *CallbackError) Code() int {
+	return c.StatusCode
+}
+
+func (c *CallbackError) Error() string {
+	return c.Message
+}
+
+type AuthCallbackFunc func(username string, password string, opt *options.AuthOptions) *CallbackError
+
 func NewOAuthServer(kid string, kmanager manager.Manager, opt *options.AuthOptions) (*OAuthServer, error) {
 	if opt.Store == nil {
 		return nil, fmt.Errorf("token store not specified")
@@ -44,7 +59,7 @@ func NewOAuthServer(kid string, kmanager manager.Manager, opt *options.AuthOptio
 
 func (o *OAuthServer) ResourceOwnerPasswordCredential(
 	ctx context.Context,
-	f func(username string, password string, opt *options.AuthOptions)) http.HandlerFunc {
+	f func(username string, password string, opt *options.AuthOptions) *CallbackError) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -96,7 +111,11 @@ func (o *OAuthServer) ResourceOwnerPasswordCredential(
 		}
 
 		// Function passed by user where they save the hashed password to db
-		f(username, password, o.options)
+		if err := f(username, password, o.options); err != nil {
+			w.WriteHeader(err.StatusCode)
+			json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
+			return
+		}
 
 		if o.options.IsIdTokenClaimsSet() {
 			c.IdClaims = o.options.GetIdToken()

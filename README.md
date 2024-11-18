@@ -17,15 +17,14 @@ keyManager.AddKey("key1", "thesecret")
 
 2. Set up token storage
 
-Then define and create a token storage. The package implements memory storage as an example (refer to the example.go file). Here is how you can do it with postgres. *YOU MUST IMPLEMENT IT FIRST.*
+Then define and create a token storage. The package includes memory storage as an example. Refer to the `store/memory_store.go` for the implementation and `example.go` file for an example of how to use it. The `store` directory also contains instructions on how to create a postgres store.
 
 ```go
-s, _ = store.NewPgTokenStore(ctx, "postgresql://postgres:postgres@localhost:5432/go_db")
+s := new(store.MemoryTokenStore)
 s.CreateStore(ctx)
 ```
 
-You can implement your own token storage but it must implement the TokenStorage interface.
-The TokenStore interface
+You can implement your own token storage but it must implement the TokenStorage interface. The TokenStore interface
 
 ```go
 type TokenStore interface {

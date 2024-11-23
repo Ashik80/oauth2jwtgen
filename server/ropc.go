@@ -61,6 +61,8 @@ func (o *OAuthServer) ResourceOwnerPasswordCredential(
 	ctx context.Context,
 	f func(username string, password string, opt *options.AuthOptions) *CallbackError) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Content-Type", "application/json")
+
 		if err := r.ParseForm(); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -130,7 +132,6 @@ func (o *OAuthServer) ResourceOwnerPasswordCredential(
 			return
 		}
 
-		w.Header().Add("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(token)
 	}
 }

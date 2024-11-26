@@ -59,7 +59,6 @@ Then we can call the password grant endpoint like this
 http.HandleFunc(
     "POST /oauth2/token",
     oauthServer.ResourceOwnerPasswordCredential(
-        ctx,
         func(r *http.Request, opt *options.AuthOptions) *server.CallbackError {
             username := r.FormValue("username")
             password := r.FormValue("password")
@@ -91,7 +90,6 @@ Since id token depends on a lot of data, it is left to be configured by the cons
 http.HandleFunc(
     "POST /oauth2/token",
     oauthServer.ResourceOwnerPasswordCredential(
-        ctx,
         func(r *http.Request, opt *options.AuthOptions) *server.CallbackError {
             username := r.FormValue("username")
             password := r.FormValue("password")
@@ -168,7 +166,6 @@ func main() {
 	http.HandleFunc(
 		"POST /oauth2/token",
 		oauthServer.ResourceOwnerPasswordCredential(
-			ctx,
 			func(r *http.Request, opt *options.AuthOptions) *server.CallbackError {
 				username := r.FormValue("username")
 				password := r.FormValue("password")

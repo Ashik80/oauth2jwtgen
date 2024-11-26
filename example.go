@@ -50,7 +50,6 @@ func main() {
 	http.HandleFunc(
 		"POST /oauth2/token",
 		oauthServer.ResourceOwnerPasswordCredential(
-			ctx,
 			func(r *http.Request, opt *options.AuthOptions) *server.CallbackError {
 				username := r.FormValue("username")
 				password := r.FormValue("password")

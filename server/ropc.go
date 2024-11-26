@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -58,9 +57,9 @@ func NewOAuthServer(kid string, kmanager manager.Manager, opt *options.AuthOptio
 }
 
 func (o *OAuthServer) ResourceOwnerPasswordCredential(
-	ctx context.Context,
 	f func(r *http.Request, opt *options.AuthOptions) *CallbackError) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 		w.Header().Add("Content-Type", "application/json")
 
 		if err := r.ParseForm(); err != nil {

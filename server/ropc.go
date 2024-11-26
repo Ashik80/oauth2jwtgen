@@ -31,7 +31,7 @@ func (c *CallbackError) Error() string {
 	return c.Message
 }
 
-type AuthCallbackFunc func(username string, password string, opt *options.AuthOptions) *CallbackError
+type AuthCallbackFunc func(r *http.Request, opt *options.AuthOptions) *CallbackError
 
 func NewOAuthServer(kid string, kmanager manager.Manager, opt *options.AuthOptions) (*OAuthServer, error) {
 	if opt.Store == nil {
@@ -59,7 +59,7 @@ func NewOAuthServer(kid string, kmanager manager.Manager, opt *options.AuthOptio
 
 func (o *OAuthServer) ResourceOwnerPasswordCredential(
 	ctx context.Context,
-	f func(username string, password string, opt *options.AuthOptions) *CallbackError) http.HandlerFunc {
+	f func(r *http.Request, opt *options.AuthOptions) *CallbackError) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "application/json")
 
@@ -77,7 +77,6 @@ func (o *OAuthServer) ResourceOwnerPasswordCredential(
 			return
 		}
 
-		password := r.FormValue("password")
 		username := r.FormValue("username")
 		aud := r.FormValue("client_id")
 		scope := r.FormValue("scope")
@@ -113,7 +112,7 @@ func (o *OAuthServer) ResourceOwnerPasswordCredential(
 		}
 
 		// Function passed by user where they save the hashed password to db
-		if err := f(username, password, o.options); err != nil {
+		if err := f(r, o.options); err != nil {
 			w.WriteHeader(err.StatusCode)
 			json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 			return

@@ -1,16 +1,21 @@
 package accessor
 
 import (
+	"context"
+	"encoding/base64"
 	"fmt"
+	"time"
 
 	"github.com/Ashik80/oauth2jwtgen/manager"
+	"github.com/Ashik80/oauth2jwtgen/options"
+	"github.com/Ashik80/oauth2jwtgen/verifier"
 
 	"github.com/golang-jwt/jwt"
 )
 
 type HS256Access struct {
-	SignedKeyID   string
-	SignedKey     []byte
+	SigningKeyID  string
+	SigningKey    []byte
 	SigningMethod jwt.SigningMethod
 }
 
@@ -21,40 +26,77 @@ func NewHS256Access(kid string, manager *manager.HSKeyManager) (*HS256Access, er
 	}
 
 	a := &HS256Access{
-		SignedKeyID:   kid,
-		SignedKey:     key,
+		SigningKeyID:  kid,
+		SigningKey:    key,
 		SigningMethod: jwt.SigningMethodHS256,
 	}
 
 	return a, nil
 }
 
-func (h *HS256Access) GetSignedKeyID() string {
-	return h.SignedKeyID
+func (h *HS256Access) GetSigningKeyID() string {
+	return h.SigningKeyID
 }
 
-func (h *HS256Access) GetSignedKey() []byte {
-	return h.SignedKey
+func (h *HS256Access) GetSigningKey() []byte {
+	return h.SigningKey
 }
 
 func (h *HS256Access) GetSigningMethod() jwt.SigningMethod {
 	return h.SigningMethod
 }
 
-func VerifyHSToken(tokenString string, signingKey string) (jwt.MapClaims, error) {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return []byte(signingKey), nil
-	})
+func (h *HS256Access) RenewToken(ctx context.Context, refreshToken string, signingKey string, opt *options.AuthOptions) (*Token, error) {
+	idBytes, err := base64.URLEncoding.DecodeString(refreshToken)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing token: %v", err)
+		return nil, fmt.Errorf("failed to decode token: %w", err)
 	}
 
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		return claims, nil
-	} else {
-		return nil, fmt.Errorf("invalid token or claim")
+	tokenInfo, err := opt.Store.GetTokenInfo(ctx, string(idBytes))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get token info: %w", err)
 	}
+
+	if tokenInfo.Expiry.Before(time.Now()) {
+		return nil, fmt.Errorf("refresh token expired")
+	}
+
+	prevAccessToken := tokenInfo.AccessToken
+	token, err := verifier.ParseHSToken(prevAccessToken, signingKey)
+	if err != nil {
+		if !IsExpiredError(err) {
+			return nil, err
+		}
+	}
+
+	accessClaims, err := GetClaimsWithUpdatedExpiry(token, opt)
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := GetParsedSigningKey(h)
+	if err != nil {
+		return nil, err
+	}
+	accessToken, err := GenerateTokenString(h, accessClaims, key)
+	if err != nil {
+		return nil, err
+	}
+
+	t := &Token{
+		AccessToken: accessToken,
+		TokenType:   "Bearer",
+		ExpiresIn:   accessClaims["exp"].(int64),
+	}
+
+	if opt.IsIdTokenClaimsSet() {
+		idClaims := opt.GetIdTokenClaims()
+		idToken, err := GenerateTokenString(h, idClaims, key)
+		if err != nil {
+			return nil, err
+		}
+		t.IdToken = idToken
+	}
+
+	return t, nil
 }

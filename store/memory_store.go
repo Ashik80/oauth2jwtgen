@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"sync"
 )
 
@@ -24,6 +25,14 @@ func (s *MemoryTokenStore) StoreToken(ctx context.Context, tokenInfo *TokenInfo)
 	s.TokenInfos[tokenInfo.ResourceOwnerId] = *tokenInfo
 
 	return nil
+}
+
+func (s *MemoryTokenStore) GetTokenInfo(ctx context.Context, resourceOwnerId string) (*TokenInfo, error) {
+	tokenInfo, exists := s.TokenInfos[resourceOwnerId]
+	if !exists {
+		return nil, errors.New("token info not found")
+	}
+	return &tokenInfo, nil
 }
 
 func (s *MemoryTokenStore) CloseConnection() error {

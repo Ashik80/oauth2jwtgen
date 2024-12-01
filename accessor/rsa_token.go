@@ -1,13 +1,14 @@
 package accessor
 
 import (
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
+	"context"
+	"encoding/base64"
 	"fmt"
-	"os"
+	"time"
 
 	"github.com/Ashik80/oauth2jwtgen/manager"
+	"github.com/Ashik80/oauth2jwtgen/options"
+	"github.com/Ashik80/oauth2jwtgen/verifier"
 
 	"github.com/golang-jwt/jwt"
 )
@@ -32,11 +33,11 @@ func NewRS256Access(kid string, manager *manager.RSKeyManager) (*RS256Access, er
 	return r, nil
 }
 
-func (r *RS256Access) GetSignedKeyID() string {
+func (r *RS256Access) GetSigningKeyID() string {
 	return r.SignedKeyID
 }
 
-func (r *RS256Access) GetSignedKey() []byte {
+func (r *RS256Access) GetSigningKey() []byte {
 	return r.SignedKey
 }
 
@@ -44,49 +45,62 @@ func (r *RS256Access) GetSigningMethod() jwt.SigningMethod {
 	return r.SigningMethod
 }
 
-func LoadRSAPublicKeyFromFile(filePath string) (*rsa.PublicKey, error) {
-	pubKeyFile, err := os.ReadFile(filePath)
+func (r *RS256Access) RenewToken(ctx context.Context, refreshToken string, signingKey string, opt *options.AuthOptions) (*Token, error) {
+	idBytes, err := base64.URLEncoding.DecodeString(refreshToken)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %v", err)
+		return nil, fmt.Errorf("failed to decode token: %w", err)
 	}
 
-	block, _ := pem.Decode(pubKeyFile)
-	if block == nil || block.Type != "PUBLIC KEY" {
-		return nil, fmt.Errorf("failed to parse PEM block containing the public key")
-	}
-
-	pubKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+	tokenInfo, err := opt.Store.GetTokenInfo(ctx, string(idBytes))
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse public key: %v", err)
+		return nil, fmt.Errorf("failed to get token info: %w", err)
 	}
 
-	rsaPubKey, ok := pubKey.(*rsa.PublicKey)
-	if !ok {
-		return nil, fmt.Errorf("not an RSA public key")
+	if tokenInfo.Expiry.Before(time.Now()) {
+		return nil, fmt.Errorf("refresh token expired")
 	}
 
-	return rsaPubKey, nil
-}
+	prevAccessToken := tokenInfo.AccessToken
 
-func VerifyRSToken(tokenString string, filePath string) (jwt.MapClaims, error) {
-	publicKey, err := LoadRSAPublicKeyFromFile(filePath)
+	publicKey, err := verifier.LoadRSAPublicKeyFromFile(signingKey)
+	if err != nil {
+		return nil, err
+	}
+	token, err := verifier.ParseRSToken(prevAccessToken, publicKey)
+	if err != nil {
+		if !IsExpiredError(err) {
+			return nil, err
+		}
+	}
+
+	claims, err := GetClaimsWithUpdatedExpiry(token, opt)
 	if err != nil {
 		return nil, err
 	}
 
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return publicKey, nil
-	})
+	key, err := GetParsedSigningKey(r)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing token: %v", err)
+		return nil, err
+	}
+	accessToken, err := GenerateTokenString(r, claims, key)
+	if err != nil {
+		return nil, err
 	}
 
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		return claims, nil
-	} else {
-		return nil, fmt.Errorf("invalid token or claim")
+	t := &Token{
+		AccessToken: accessToken,
+		TokenType:   "Bearer",
+		ExpiresIn:   claims["exp"].(int64),
 	}
+
+	if opt.IsIdTokenClaimsSet() {
+		idClaims := opt.GetIdTokenClaims()
+		idToken, err := GenerateTokenString(r, idClaims, []byte(signingKey))
+		if err != nil {
+			return nil, err
+		}
+		t.IdToken = idToken
+	}
+
+	return t, nil
 }

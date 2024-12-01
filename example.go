@@ -20,7 +20,8 @@ func main() {
 	//     m := manager.NewRSKeyManager()
 	//     m.AddKey("key1", "keys/private.key")
 
-	// By default validity of token is 10 minutes
+	// By default validity of access token is 10 minutes
+	// and refresh token is 1 hour
 	v := &options.Validity{
 		AccessExpiresIn:  15 * 60, // 15 minutes
 		RefreshExpiresIn: 30 * 60, // 30 minutes
@@ -39,6 +40,14 @@ func main() {
 		Validity: v,
 		Store:    s,
 	}
+
+	// Set this option if you want to save the refresh or access token in a cookie
+	// o.SetRefreshTokenInCookie(&options.CookieOptions{
+	// 	Secure:   true,
+	// 	HttpOnly: true,
+	// 	Path:     "/",
+	// 	MaxAge:   v.GetRefreshExpiresIn(),
+	// })
 
 	// Specify here which key to use. For example, we are using key1 here
 	oauthServer, err := server.NewOAuthServer("key1", m, o)

@@ -7,9 +7,13 @@ import (
 )
 
 type AuthOptions struct {
-	Validity      *Validity
-	Store         store.TokenStore
-	idTokenClaims *claims.JWTIdClaims
+	Validity             *Validity
+	Store                store.TokenStore
+	idTokenClaims        *claims.JWTIdClaims
+	RefreshInCookie      bool
+	AccessInCookie       bool
+	RefreshCookieOptions *CookieOptions
+	AccessCookieOptions  *CookieOptions
 }
 
 func DefaultAuthOptions() *AuthOptions {
@@ -38,6 +42,26 @@ func (s *AuthOptions) IsIdTokenClaimsSet() bool {
 	return s.idTokenClaims != nil
 }
 
-func (s *AuthOptions) GetIdToken() *claims.JWTIdClaims {
+func (s *AuthOptions) GetIdTokenClaims() *claims.JWTIdClaims {
 	return s.idTokenClaims
+}
+
+func (s *AuthOptions) SetRefreshTokenInCookie(cookieOptions *CookieOptions) {
+	s.RefreshInCookie = true
+	s.RefreshCookieOptions = new(CookieOptions)
+	s.RefreshCookieOptions.SetName("refresh_token")
+	s.RefreshCookieOptions.MapFrom(cookieOptions)
+	if s.RefreshCookieOptions.MaxAge == 0 {
+		s.RefreshCookieOptions.MaxAge = s.Validity.RefreshExpiresIn
+	}
+}
+
+func (s *AuthOptions) SetAccessTokenInCookie(cookieOptions *CookieOptions) {
+	s.AccessInCookie = true
+	s.AccessCookieOptions = new(CookieOptions)
+	s.AccessCookieOptions.SetName("access_token")
+	s.AccessCookieOptions.MapFrom(cookieOptions)
+	if s.AccessCookieOptions.MaxAge == 0 {
+		s.AccessCookieOptions.MaxAge = int(s.Validity.AccessExpiresIn)
+	}
 }

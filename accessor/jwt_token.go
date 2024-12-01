@@ -23,18 +23,20 @@ type Token struct {
 }
 
 type JWTAccess interface {
-	GetSignedKeyID() string
-	GetSignedKey() []byte
+	GetSigningKeyID() string
+	GetSigningKey() []byte
 	GetSigningMethod() jwt.SigningMethod
+	RenewToken(ctx context.Context, refreshToken string, signingKey string, opt *options.AuthOptions) (*Token, error)
 }
 
+// Returns the token object (or an error) that consists of id, access and refresh tokens
 func NewToken(ctx context.Context, a JWTAccess, c *claims.JWTClaims, opt *options.AuthOptions) (*Token, error) {
 	key, err := GetParsedSigningKey(a)
 	if err != nil {
 		return nil, err
 	}
 
-	accessToken, err := GenerateAccessToken(a, c.AccessClaims, key)
+	accessToken, err := GenerateTokenString(a, c.AccessClaims, key)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +48,7 @@ func NewToken(ctx context.Context, a JWTAccess, c *claims.JWTClaims, opt *option
 	}
 
 	if c.IdClaims != nil {
-		idToken, err := GenerateIdToken(a, c.IdClaims, key)
+		idToken, err := GenerateTokenString(a, c.IdClaims, key)
 		if err != nil {
 			return nil, err
 		}
@@ -67,40 +69,30 @@ func NewToken(ctx context.Context, a JWTAccess, c *claims.JWTClaims, opt *option
 
 func GetParsedSigningKey(a JWTAccess) (interface{}, error) {
 	signingMethod := a.GetSigningMethod()
-	signedKey := a.GetSignedKey()
+	signingKey := a.GetSigningKey()
 
 	var key interface{}
 	if strings.HasPrefix(signingMethod.Alg(), "RS") {
-		privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(signedKey)
+		privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(signingKey)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing RSA key: %w", err)
 		}
 		key = privateKey
 	} else if strings.HasPrefix(signingMethod.Alg(), "HS") {
-		key = signedKey
+		key = signingKey
 	}
 
 	return key, nil
 }
 
-func GenerateAccessToken(a JWTAccess, accessClaims *claims.JWTAccessClaims, signingKey interface{}) (string, error) {
+func GenerateTokenString(a JWTAccess, accessClaims jwt.Claims, signingKey interface{}) (string, error) {
 	token := jwt.NewWithClaims(a.GetSigningMethod(), accessClaims)
-	token.Header["kid"] = a.GetSignedKeyID()
+	token.Header["kid"] = a.GetSigningKeyID()
 	accessToken, err := token.SignedString(signingKey)
 	if err != nil {
 		return "", fmt.Errorf("failed to sign token: %w", err)
 	}
 	return accessToken, nil
-}
-
-func GenerateIdToken(a JWTAccess, idClaims *claims.JWTIdClaims, signingKey interface{}) (string, error) {
-	idToken := jwt.NewWithClaims(a.GetSigningMethod(), idClaims)
-	idToken.Header["kid"] = a.GetSignedKeyID()
-	idString, err := idToken.SignedString(signingKey)
-	if err != nil {
-		return "", fmt.Errorf("failed to sign token: %w", err)
-	}
-	return idString, nil
 }
 
 func GenerateRefreshToken(ctx context.Context, accessToken string, opt *options.AuthOptions) (string, error) {
@@ -118,4 +110,28 @@ func GenerateRefreshToken(ctx context.Context, accessToken string, opt *options.
 	}
 
 	return refresh, nil
+}
+
+func IsExpiredError(err error) bool {
+	if vErr, ok := err.(*jwt.ValidationError); !ok || vErr.Errors&jwt.ValidationErrorExpired != 16 {
+		return false
+	}
+	return true
+}
+
+func GetClaimsWithUpdatedExpiry(token *jwt.Token, opt *options.AuthOptions) (jwt.MapClaims, error) {
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, fmt.Errorf("failed to get claims")
+	}
+	if opt.Validity == nil {
+		v := &options.Validity{}
+		v.SetDefaultAccessExpiresIn()
+		opt.Validity = v
+	}
+	newIat := time.Now().UTC().Unix()
+	newExp := newIat + opt.Validity.AccessExpiresIn
+	claims["iat"] = newIat
+	claims["exp"] = newExp
+	return claims, nil
 }

@@ -118,7 +118,7 @@ func (o *OAuthServer) ResourceOwnerPasswordCredential(
 		}
 
 		if o.options.IsIdTokenClaimsSet() {
-			c.IdClaims = o.options.GetIdToken()
+			c.IdClaims = o.options.GetIdTokenClaims()
 			claims.CopyStandardClaims(&c.IdClaims.StandardClaims, &accessClaims.StandardClaims)
 		}
 
@@ -130,6 +130,27 @@ func (o *OAuthServer) ResourceOwnerPasswordCredential(
 			return
 		}
 
+		if o.options.RefreshInCookie {
+			refreshCookie := SetCookie(o.options.RefreshCookieOptions, token.RefreshToken)
+			http.SetCookie(w, refreshCookie)
+		}
+
+		if o.options.AccessInCookie {
+			accessCookie := SetCookie(o.options.AccessCookieOptions, token.AccessToken)
+			http.SetCookie(w, accessCookie)
+		}
+
 		json.NewEncoder(w).Encode(token)
+	}
+}
+
+func SetCookie(cookieOptions *options.CookieOptions, value string) *http.Cookie {
+	return &http.Cookie{
+		Name:     cookieOptions.GetName(),
+		Value:    value,
+		Secure:   cookieOptions.Secure,
+		HttpOnly: cookieOptions.HttpOnly,
+		MaxAge:   cookieOptions.MaxAge,
+		Path:     cookieOptions.Path,
 	}
 }

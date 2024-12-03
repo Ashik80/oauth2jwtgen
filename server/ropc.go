@@ -76,6 +76,13 @@ func (o *OAuthServer) ResourceOwnerPasswordCredential(
 			return
 		}
 
+		// Function passed by user where they save the hashed password to db
+		if err := f(r, o.options); err != nil {
+			w.WriteHeader(err.StatusCode)
+			json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
+			return
+		}
+
 		username := r.FormValue("username")
 		aud := r.FormValue("client_id")
 		scope := r.FormValue("scope")
@@ -104,22 +111,16 @@ func (o *OAuthServer) ResourceOwnerPasswordCredential(
 		}
 
 		issuer := r.Host
+		roles := o.options.GetRoles()
 
-		accessClaims := claims.GenerateClaims(username, issuer, aud, scope, o.options.Validity.AccessExpiresIn)
+		accessClaims := claims.GenerateAccessClaims(username, issuer, aud, scope, roles, o.options.Validity.AccessExpiresIn)
 		c := &claims.JWTClaims{
 			AccessClaims: accessClaims,
 		}
 
-		// Function passed by user where they save the hashed password to db
-		if err := f(r, o.options); err != nil {
-			w.WriteHeader(err.StatusCode)
-			json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
-			return
-		}
-
 		if o.options.IsIdTokenClaimsSet() {
 			c.IdClaims = o.options.GetIdTokenClaims()
-			claims.CopyStandardClaims(&c.IdClaims.StandardClaims, &accessClaims.StandardClaims)
+			c.IdClaims.MapClaims(accessClaims)
 		}
 
 		token, err := accessor.NewToken(ctx, access, c, o.options)

@@ -14,6 +14,7 @@ type AuthOptions struct {
 	AccessInCookie       bool
 	RefreshCookieOptions *CookieOptions
 	AccessCookieOptions  *CookieOptions
+	roles                []string
 }
 
 func DefaultAuthOptions() *AuthOptions {
@@ -64,4 +65,12 @@ func (s *AuthOptions) SetAccessTokenInCookie(cookieOptions *CookieOptions) {
 	if s.AccessCookieOptions.MaxAge == 0 {
 		s.AccessCookieOptions.MaxAge = int(s.Validity.AccessExpiresIn)
 	}
+}
+
+func (s *AuthOptions) SetRoles(roles []string) {
+	s.roles = roles
+}
+
+func (s *AuthOptions) GetRoles() []string {
+	return s.roles
 }

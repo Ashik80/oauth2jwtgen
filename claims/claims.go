@@ -13,21 +13,24 @@ type JWTClaims struct {
 
 type JWTAccessClaims struct {
 	jwt.StandardClaims
-	Scope string `json:"scope,omitempty"`
+	Scope string   `json:"scope,omitempty"`
+	Roles []string `json:"roles,omitempty"`
 }
 
 type JWTIdClaims struct {
 	jwt.StandardClaims
-	Name              string `json:"name,omitempty"`
-	GivenName         string `json:"given_name,omitempty"`
-	FamilyName        string `json:"family_name,omitempty"`
-	Email             string `json:"email,omitempty"`
-	Picture           string `json:"picture,omitempty"`
-	Locale            string `json:"locale,omitempty"`
-	PreferredUsername string `json:"preferred_username,omitempty"`
+	Name              string   `json:"name,omitempty"`
+	GivenName         string   `json:"given_name,omitempty"`
+	FamilyName        string   `json:"family_name,omitempty"`
+	Email             string   `json:"email,omitempty"`
+	Picture           string   `json:"picture,omitempty"`
+	Locale            string   `json:"locale,omitempty"`
+	PreferredUsername string   `json:"preferred_username,omitempty"`
+	Scope             string   `json:"scope,omitempty"`
+	Roles             []string `json:"roles,omitempty"`
 }
 
-func GenerateClaims(sub string, issuer string, aud string, scope string, expiresAfterSeconds int64) *JWTAccessClaims {
+func GenerateAccessClaims(sub string, issuer string, aud string, scope string, roles []string, expiresAfterSeconds int64) *JWTAccessClaims {
 	iat := time.Now().UTC().Unix()
 
 	claims := &JWTAccessClaims{
@@ -39,14 +42,13 @@ func GenerateClaims(sub string, issuer string, aud string, scope string, expires
 			ExpiresAt: iat + expiresAfterSeconds,
 		},
 		Scope: scope,
+		Roles: roles,
 	}
 	return claims
 }
 
-func CopyStandardClaims(dest *jwt.StandardClaims, src *jwt.StandardClaims) {
-	dest.Issuer = src.Issuer
-	dest.Audience = src.Audience
-	dest.Subject = src.Subject
-	dest.IssuedAt = src.IssuedAt
-	dest.ExpiresAt = src.ExpiresAt
+func (c *JWTIdClaims) MapClaims(accessClaims *JWTAccessClaims) {
+	c.StandardClaims = accessClaims.StandardClaims
+	c.Roles = accessClaims.Roles
+	c.Scope = accessClaims.Scope
 }

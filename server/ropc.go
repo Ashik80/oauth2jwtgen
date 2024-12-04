@@ -85,7 +85,6 @@ func (o *OAuthServer) ResourceOwnerPasswordCredential(
 
 		username := r.FormValue("username")
 		aud := r.FormValue("client_id")
-		scope := r.FormValue("scope")
 
 		var access accessor.JWTAccess
 		var err error
@@ -111,15 +110,17 @@ func (o *OAuthServer) ResourceOwnerPasswordCredential(
 		}
 
 		issuer := r.Host
-		roles := o.options.GetRoles()
+		setClaims := o.options.GetAccessTokenClaims(username)
+		scope := setClaims.Scope
+		roles := setClaims.Roles
 
 		accessClaims := claims.GenerateAccessClaims(username, issuer, aud, scope, roles, o.options.Validity.AccessExpiresIn)
 		c := &claims.JWTClaims{
 			AccessClaims: accessClaims,
 		}
 
-		if o.options.IsIdTokenClaimsSet() {
-			c.IdClaims = o.options.GetIdTokenClaims()
+		if o.options.IsIdTokenClaimsSet(username) {
+			c.IdClaims = o.options.GetIdTokenClaims(username)
 			c.IdClaims.MapClaims(accessClaims)
 		}
 

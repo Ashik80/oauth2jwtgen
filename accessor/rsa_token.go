@@ -73,7 +73,7 @@ func (r *RS256Access) RenewToken(ctx context.Context, refreshToken string, signi
 		}
 	}
 
-	claims, err := GetClaimsWithUpdatedExpiry(token, opt)
+	accessClaims, err := GetClaimsWithUpdatedExpiry(token, opt)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func (r *RS256Access) RenewToken(ctx context.Context, refreshToken string, signi
 	if err != nil {
 		return nil, err
 	}
-	accessToken, err := GenerateTokenString(r, claims, key)
+	accessToken, err := GenerateTokenString(r, accessClaims, key)
 	if err != nil {
 		return nil, err
 	}
@@ -90,11 +90,13 @@ func (r *RS256Access) RenewToken(ctx context.Context, refreshToken string, signi
 	t := &Token{
 		AccessToken: accessToken,
 		TokenType:   "Bearer",
-		ExpiresIn:   claims["exp"].(int64),
+		ExpiresIn:   accessClaims["exp"].(int64),
 	}
 
-	if opt.IsIdTokenClaimsSet() {
-		idClaims := opt.GetIdTokenClaims()
+	username := accessClaims["username"].(string)
+
+	if opt.IsIdTokenClaimsSet(username) {
+		idClaims := opt.GetIdTokenClaims(username)
 		idToken, err := GenerateTokenString(r, idClaims, []byte(signingKey))
 		if err != nil {
 			return nil, err

@@ -1,6 +1,8 @@
 package options
 
 import (
+	"sync"
+
 	"github.com/Ashik80/oauth2jwtgen/claims"
 	"github.com/Ashik80/oauth2jwtgen/store"
 	"github.com/golang-jwt/jwt"
@@ -9,12 +11,13 @@ import (
 type AuthOptions struct {
 	Validity             *Validity
 	Store                store.TokenStore
-	idTokenClaims        *claims.JWTIdClaims
 	RefreshInCookie      bool
 	AccessInCookie       bool
 	RefreshCookieOptions *CookieOptions
 	AccessCookieOptions  *CookieOptions
-	roles                []string
+	idTokenClaims        map[string]*claims.JWTIdClaims
+	accessTokenClaims    map[string]*claims.JWTAccessClaims
+	mu                   sync.Mutex
 }
 
 func DefaultAuthOptions() *AuthOptions {
@@ -27,31 +30,40 @@ func DefaultAuthOptions() *AuthOptions {
 	}
 }
 
-func (s *AuthOptions) AddIdTokenClaims(c *claims.JWTIdClaims) {
-	s.idTokenClaims = new(claims.JWTIdClaims)
-	s.idTokenClaims.Name = c.Name
-	s.idTokenClaims.GivenName = c.GivenName
-	s.idTokenClaims.FamilyName = c.FamilyName
-	s.idTokenClaims.Email = c.Email
-	s.idTokenClaims.Picture = c.Picture
-	s.idTokenClaims.Locale = c.Locale
-	s.idTokenClaims.PreferredUsername = c.PreferredUsername
-	s.idTokenClaims.StandardClaims = jwt.StandardClaims{}
+func (s *AuthOptions) SetIdTokenClaims(username string, c *claims.JWTIdClaims) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.idTokenClaims == nil {
+		s.idTokenClaims = make(map[string]*claims.JWTIdClaims)
+	}
+	s.idTokenClaims[username] = c
+	s.idTokenClaims[username].StandardClaims = jwt.StandardClaims{}
 }
 
-func (s *AuthOptions) IsIdTokenClaimsSet() bool {
-	return s.idTokenClaims != nil
+func (s *AuthOptions) IsIdTokenClaimsSet(username string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.idTokenClaims == nil {
+		return false
+	}
+	_, exists := s.idTokenClaims[username]
+	return exists
 }
 
-func (s *AuthOptions) GetIdTokenClaims() *claims.JWTIdClaims {
-	return s.idTokenClaims
+func (s *AuthOptions) GetIdTokenClaims(username string) *claims.JWTIdClaims {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.idTokenClaims[username]
 }
 
 func (s *AuthOptions) SetRefreshTokenInCookie(cookieOptions *CookieOptions) {
 	s.RefreshInCookie = true
 	s.RefreshCookieOptions = new(CookieOptions)
 	s.RefreshCookieOptions.SetName("refresh_token")
-	s.RefreshCookieOptions.MapFrom(cookieOptions)
+	s.RefreshCookieOptions = cookieOptions
 	if s.RefreshCookieOptions.MaxAge == 0 {
 		s.RefreshCookieOptions.MaxAge = s.Validity.RefreshExpiresIn
 	}
@@ -61,16 +73,25 @@ func (s *AuthOptions) SetAccessTokenInCookie(cookieOptions *CookieOptions) {
 	s.AccessInCookie = true
 	s.AccessCookieOptions = new(CookieOptions)
 	s.AccessCookieOptions.SetName("access_token")
-	s.AccessCookieOptions.MapFrom(cookieOptions)
+	s.RefreshCookieOptions = cookieOptions
 	if s.AccessCookieOptions.MaxAge == 0 {
 		s.AccessCookieOptions.MaxAge = int(s.Validity.AccessExpiresIn)
 	}
 }
 
-func (s *AuthOptions) SetRoles(roles []string) {
-	s.roles = roles
+func (s *AuthOptions) SetAccessTokenClaims(username string, accessClaims *claims.JWTAccessClaims) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.accessTokenClaims == nil {
+		s.accessTokenClaims = make(map[string]*claims.JWTAccessClaims)
+	}
+	s.accessTokenClaims[username] = accessClaims
 }
 
-func (s *AuthOptions) GetRoles() []string {
-	return s.roles
+func (s *AuthOptions) GetAccessTokenClaims(username string) *claims.JWTAccessClaims {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.accessTokenClaims[username]
 }

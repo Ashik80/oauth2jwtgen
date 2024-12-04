@@ -8,13 +8,6 @@ type CookieOptions struct {
 	MaxAge   int
 }
 
-func (c *CookieOptions) MapFrom(cookieOptions *CookieOptions) {
-	c.Secure = cookieOptions.Secure
-	c.HttpOnly = cookieOptions.HttpOnly
-	c.Path = cookieOptions.Path
-	c.MaxAge = cookieOptions.MaxAge
-}
-
 func (c *CookieOptions) GetName() string {
 	return c.name
 }

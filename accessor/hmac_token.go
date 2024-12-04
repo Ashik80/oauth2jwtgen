@@ -89,7 +89,8 @@ func (h *HS256Access) RenewToken(ctx context.Context, refreshToken string, signi
 		ExpiresIn:   accessClaims["exp"].(int64),
 	}
 
-	username := accessClaims["username"].(string)
+	username := accessClaims["sub"].(string)
+	fmt.Println(accessClaims["sub"])
 
 	if opt.IsIdTokenClaimsSet(username) {
 		idClaims := opt.GetIdTokenClaims(username)

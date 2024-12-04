@@ -142,6 +142,7 @@ func (o *OAuthServer) ResourceOwnerPasswordCredential(
 			http.SetCookie(w, accessCookie)
 		}
 
+		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(token)
 	}
 }

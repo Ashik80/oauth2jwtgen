@@ -104,5 +104,10 @@ func (r *RS256Access) RenewToken(ctx context.Context, refreshToken string, signi
 		t.IdToken = idToken
 	}
 
+	err = opt.Store.UpdateTokenInfo(ctx, string(idBytes), accessToken, t.IdToken)
+	if err != nil {
+		return nil, err
+	}
+
 	return t, nil
 }

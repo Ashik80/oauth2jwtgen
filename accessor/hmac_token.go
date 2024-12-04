@@ -90,7 +90,6 @@ func (h *HS256Access) RenewToken(ctx context.Context, refreshToken string, signi
 	}
 
 	username := accessClaims["sub"].(string)
-	fmt.Println(accessClaims["sub"])
 
 	if opt.IsIdTokenClaimsSet(username) {
 		idClaims := opt.GetIdTokenClaims(username)
@@ -99,6 +98,11 @@ func (h *HS256Access) RenewToken(ctx context.Context, refreshToken string, signi
 			return nil, err
 		}
 		t.IdToken = idToken
+	}
+
+	err = opt.Store.UpdateTokenInfo(ctx, string(idBytes), accessToken, t.IdToken)
+	if err != nil {
+		return nil, err
 	}
 
 	return t, nil

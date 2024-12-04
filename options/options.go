@@ -89,6 +89,17 @@ func (s *AuthOptions) SetAccessTokenClaims(username string, accessClaims *claims
 	s.accessTokenClaims[username] = accessClaims
 }
 
+func (s *AuthOptions) IsAccessTokenClaimsSet(username string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.accessTokenClaims == nil {
+		return false
+	}
+	_, exists := s.accessTokenClaims[username]
+	return exists
+}
+
 func (s *AuthOptions) GetAccessTokenClaims(username string) *claims.JWTAccessClaims {
 	s.mu.Lock()
 	defer s.mu.Unlock()

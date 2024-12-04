@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 
+	"github.com/Ashik80/oauth2jwtgen/accessor"
 	"github.com/Ashik80/oauth2jwtgen/manager"
 	"github.com/Ashik80/oauth2jwtgen/options"
 	"github.com/Ashik80/oauth2jwtgen/server"
@@ -42,12 +44,13 @@ func main() {
 	}
 
 	// Set this option if you want to save the refresh or access token in a cookie
-	// o.SetRefreshTokenInCookie(&options.CookieOptions{
-	// 	Secure:   true,
-	// 	HttpOnly: true,
-	// 	Path:     "/",
-	// 	MaxAge:   v.GetRefreshExpiresIn(),
-	// })
+	// NOTE: for mobile use a header to pass the refresh token as cookies won't work
+	o.SetRefreshTokenInCookie(&options.CookieOptions{
+		Secure:   false, // set to true in production
+		HttpOnly: true,
+		Path:     "/",
+		MaxAge:   v.GetRefreshExpiresIn(),
+	})
 
 	// Specify here which key to use. For example, we are using key1 here
 	oauthServer, err := server.NewOAuthServer("key1", m, o)
@@ -55,8 +58,10 @@ func main() {
 		log.Fatalf("%v", err)
 	}
 
+	mux := http.NewServeMux()
+
 	// Password grant flow endpoint example
-	http.HandleFunc(
+	mux.HandleFunc(
 		"POST /oauth2/token",
 		oauthServer.ResourceOwnerPasswordCredential(
 			func(r *http.Request, opt *options.AuthOptions) *server.CallbackError {
@@ -66,5 +71,32 @@ func main() {
 				return nil
 			}))
 
-	http.ListenAndServe(":4040", nil)
+	// Renew token flow endpoint example
+	mux.HandleFunc(
+		"GET /oauth2/refresh-token",
+		func(w http.ResponseWriter, r *http.Request) {
+			refreshCookie, _ := r.Cookie("refresh_token")
+			acc, _ := accessor.NewHS256Access("key1", m)
+			token, _ := acc.RenewToken(r.Context(), refreshCookie.Value, "thesecret", o)
+			w.Header().Add("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(token)
+		})
+
+	http.ListenAndServe(":4040", enableCors(mux))
+}
+
+func enableCors(next http.Handler) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Access-Control-Allow-Origin", "http://localhost:3000")
+		w.Header().Add("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+		w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Add("Access-Control-Allow-Credentials", "true") // important for if using cookie
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next.ServeHTTP(w, r)
+	}
+	return http.HandlerFunc(fn)
 }

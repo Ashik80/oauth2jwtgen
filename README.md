@@ -31,6 +31,7 @@ type TokenStore interface {
 	CreateStore(ctx context.Context) error
 	StoreToken(ctx context.Context, tokenInfo *TokenInfo) error
 	GetTokenInfo(ctx context.Context, resourceOwnerId string) (*TokenInfo, error)
+	UpdateTokenInfo(ctx context.Context, resourceOwnerId string, accessToken string, idToken string) error
 	CloseConnection() error
 }
 ```
@@ -112,4 +113,4 @@ http.HandleFunc(
 
 ## Example
 
-Take a look at the `example.go` file for a detailed server setup
+Take a look at the `example.go` file for a detailed server setup with cookie based authentication

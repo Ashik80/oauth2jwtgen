@@ -110,9 +110,14 @@ func (o *OAuthServer) ResourceOwnerPasswordCredential(
 		}
 
 		issuer := r.Host
-		setClaims := o.options.GetAccessTokenClaims(username)
-		scope := setClaims.Scope
-		roles := setClaims.Roles
+
+		var scope string
+		var roles []string
+		if o.options.IsAccessTokenClaimsSet(username) {
+			setClaims := o.options.GetAccessTokenClaims(username)
+			scope = setClaims.Scope
+			roles = setClaims.Roles
+		}
 
 		accessClaims := claims.GenerateAccessClaims(username, issuer, aud, scope, roles, o.options.Validity.AccessExpiresIn)
 		c := &claims.JWTClaims{

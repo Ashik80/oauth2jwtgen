@@ -35,9 +35,25 @@ func (s *MemoryTokenStore) GetTokenInfo(ctx context.Context, resourceOwnerId str
 	return &tokenInfo, nil
 }
 
+func (s *MemoryTokenStore) UpdateTokenInfo(ctx context.Context, resourceOwnerId string, accessToken string, idToken string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	tokenInfo, exists := s.TokenInfos[resourceOwnerId]
+	if !exists {
+		return errors.New("token info not found")
+	}
+	tokenInfo.AccessToken = accessToken
+	if idToken != "" {
+		tokenInfo.IdToken = &idToken
+	}
+	s.TokenInfos[resourceOwnerId] = tokenInfo
+	return nil
+}
+
 func (s *MemoryTokenStore) CloseConnection() error {
 	s.mu.Lock()
-	s.mu.Unlock()
+	defer s.mu.Unlock()
 	s.TokenInfos = nil
 
 	return nil

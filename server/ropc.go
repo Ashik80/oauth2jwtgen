@@ -84,7 +84,7 @@ func (o *OAuthServer) ResourceOwnerPasswordCredential(
 		}
 
 		username := r.FormValue("username")
-		aud := r.FormValue("client_id")
+		aud := r.Header.Get("Origin")
 
 		var access accessor.JWTAccess
 		var err error
@@ -137,13 +137,13 @@ func (o *OAuthServer) ResourceOwnerPasswordCredential(
 			return
 		}
 
-		if o.options.RefreshInCookie {
-			refreshCookie := SetCookie(o.options.RefreshCookieOptions, token.RefreshToken)
+		if o.options.IsRefreshTokenInCookie() {
+			refreshCookie := SetCookie(o.options.GetRefreshCookieOptions(), token.RefreshToken)
 			http.SetCookie(w, refreshCookie)
 		}
 
-		if o.options.AccessInCookie {
-			accessCookie := SetCookie(o.options.AccessCookieOptions, token.AccessToken)
+		if o.options.IsAccessTokenInCookie() {
+			accessCookie := SetCookie(o.options.GetAccessCookieOptions(), token.AccessToken)
 			http.SetCookie(w, accessCookie)
 		}
 
@@ -160,5 +160,6 @@ func SetCookie(cookieOptions *options.CookieOptions, value string) *http.Cookie 
 		HttpOnly: cookieOptions.HttpOnly,
 		MaxAge:   cookieOptions.MaxAge,
 		Path:     cookieOptions.Path,
+		SameSite: cookieOptions.SameSite,
 	}
 }

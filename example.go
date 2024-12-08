@@ -15,8 +15,10 @@ import (
 )
 
 func main() {
+	secretKey := "thesecret" // secrets should be stored in env variables
+
 	m := manager.NewHSKeyManager()
-	m.AddKey("key1", "thesecret") // secrets should be stored in env variables
+	m.AddKey("key1", secretKey)
 	// For RSA keys add the path to the key
 	// Eg:
 	//     m := manager.NewRSKeyManager()
@@ -77,7 +79,7 @@ func main() {
 		func(w http.ResponseWriter, r *http.Request) {
 			refreshCookie, _ := r.Cookie("refresh_token")
 			acc, _ := accessor.NewHS256Access("key1", m)
-			token, _ := acc.RenewToken(r.Context(), refreshCookie.Value, "thesecret", o)
+			token, _ := acc.RenewToken(r.Context(), refreshCookie.Value, secretKey, o)
 			w.Header().Add("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(token)

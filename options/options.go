@@ -11,10 +11,10 @@ import (
 type AuthOptions struct {
 	Validity             *Validity
 	Store                store.TokenStore
-	RefreshInCookie      bool
-	AccessInCookie       bool
-	RefreshCookieOptions *CookieOptions
-	AccessCookieOptions  *CookieOptions
+	refreshInCookie      bool
+	accessInCookie       bool
+	refreshCookieOptions *CookieOptions
+	accessCookieOptions  *CookieOptions
 	idTokenClaims        map[string]*claims.JWTIdClaims
 	accessTokenClaims    map[string]*claims.JWTAccessClaims
 	mu                   sync.Mutex
@@ -60,22 +60,22 @@ func (s *AuthOptions) GetIdTokenClaims(username string) *claims.JWTIdClaims {
 }
 
 func (s *AuthOptions) SetRefreshTokenInCookie(cookieOptions *CookieOptions) {
-	s.RefreshInCookie = true
-	s.RefreshCookieOptions = new(CookieOptions)
-	s.RefreshCookieOptions = cookieOptions
-	s.RefreshCookieOptions.SetName("refresh_token")
-	if s.RefreshCookieOptions.MaxAge == 0 {
-		s.RefreshCookieOptions.MaxAge = s.Validity.RefreshExpiresIn
+	s.refreshInCookie = true
+	s.refreshCookieOptions = new(CookieOptions)
+	s.refreshCookieOptions = cookieOptions
+	s.refreshCookieOptions.SetName("refresh_token")
+	if s.refreshCookieOptions.MaxAge == 0 {
+		s.refreshCookieOptions.MaxAge = s.Validity.RefreshExpiresIn
 	}
 }
 
 func (s *AuthOptions) SetAccessTokenInCookie(cookieOptions *CookieOptions) {
-	s.AccessInCookie = true
-	s.AccessCookieOptions = new(CookieOptions)
-	s.RefreshCookieOptions = cookieOptions
-	s.AccessCookieOptions.SetName("access_token")
-	if s.AccessCookieOptions.MaxAge == 0 {
-		s.AccessCookieOptions.MaxAge = int(s.Validity.AccessExpiresIn)
+	s.accessInCookie = true
+	s.accessCookieOptions = new(CookieOptions)
+	s.refreshCookieOptions = cookieOptions
+	s.accessCookieOptions.SetName("access_token")
+	if s.accessCookieOptions.MaxAge == 0 {
+		s.accessCookieOptions.MaxAge = int(s.Validity.AccessExpiresIn)
 	}
 }
 
@@ -105,4 +105,20 @@ func (s *AuthOptions) GetAccessTokenClaims(username string) *claims.JWTAccessCla
 	defer s.mu.Unlock()
 
 	return s.accessTokenClaims[username]
+}
+
+func (s *AuthOptions) IsRefreshTokenInCookie() bool {
+	return s.refreshInCookie
+}
+
+func (s *AuthOptions) GetRefreshCookieOptions() *CookieOptions {
+	return s.refreshCookieOptions
+}
+
+func (s *AuthOptions) IsAccessTokenInCookie() bool {
+	return s.accessInCookie
+}
+
+func (s *AuthOptions) GetAccessCookieOptions() *CookieOptions {
+	return s.accessCookieOptions
 }
